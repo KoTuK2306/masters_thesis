@@ -14,6 +14,8 @@ from vqa_utils.pauli_compose import pauli_compose
 from vqa_utils.generate_shifted_theta import generate_shifted_theta
 from vqa_utils.simulated_annealing import simulated_annealing
 from vqa_utils.calculate_ansatz import calculate_ansatz
+from vqa_utils.compute_uhu import compute_uhu
+from vqa_utils.calculate_expectation import calculate_expectation
 
 from constants.file_paths import HAMILTONIAN_FILE_PATH
 
@@ -56,6 +58,29 @@ def main() -> None:
         console_and_print(console, Panel("[red]Требуется минимум 2 оператора Паули[/red]", border_style="red"))
         return
 
+    # Тестируемый анзац
+    pauli_operators = [
+        (1.0, [0, 0, 2, 1]),  # σ₀₀₂₁
+        (1.0, [1, 2, 0, 0]),  # σ₁₂₀₀
+        (1.0, [1, 1, 1, 2]),  # σ₁₁₁₂
+        (1.0, [1, 2, 1, 1]),  # σ₁₂₁₁
+    ]
+
+    # Чтение операторов гамильтониана из файла 
+    hamiltonian_operators, _ = read_hamiltonian_data(HAMILTONIAN_FILE_PATH)
+
+    # Получение начального состояния θ
+    initial_theta = generate_shifted_theta(pauli_operators)
+
+    # Вывод прочтённого гамильтониана
+    print_hamiltonian(console, hamiltonian_operators)
+    
+    # Вывод таблицы операторов гамильтониана (коэффициент, строка Паули)
+    print_pauli_table(console, pauli_operators)
+
+    # Вывод композиций операторов Паули
+    print_composition_table(console, pauli_compose, [op for _, op in pauli_operators])
+
     # Параметры отжига
     SA_PARAMS = {
         "initial_temp": 100.0,
@@ -72,12 +97,7 @@ def main() -> None:
         SA_PARAMS["cooling_rate"], 
         SA_PARAMS["min_temp"]
     )
-    steps_per_m = temp_steps * (thermalization_steps + SA_PARAMS["num_iterations_per_temp"])
-    total_steps = steps_per_m * (len(pauli_operators) - 1)
-
-    best_energy = float("inf")
-    best_result = None
-    all_results = []
+    total_steps = temp_steps * (thermalization_steps + SA_PARAMS["num_iterations_per_temp"])
 
     # Запуск прогресс-бара с симпатичным оформлением
     with Progress(
@@ -88,51 +108,26 @@ def main() -> None:
     ) as progress:
         task = progress.add_task("[cyan]Отжиг...", total=total_steps)
 
-        # Последовательно увеличиваем число операторов в анзаце
-        for m in range(2, len(pauli_operators) + 1):
-            current_ops = pauli_operators[:m]
-            initial_theta = generate_shifted_theta(current_ops)
+        optimized_theta, _ = simulated_annealing(
+            initial_theta=initial_theta,
+            pauli_operators=pauli_operators,
+            hamiltonian_operators=hamiltonian_operators,
+            progress=progress,
+            task=task,
+            **SA_PARAMS,
+        )
 
-            # Оптимизация параметров для текущего поднабора операторов
-            optimized_theta, energy = simulated_annealing(
-                initial_theta=initial_theta,
-                pauli_operators=current_ops,
-                progress=progress,
-                task=task,
-                **SA_PARAMS
-            )
+    ansatz_dict, ansatz_symbolic, ansatz_numeric = calculate_ansatz(optimized_theta, pauli_operators)
+    uhu_dict = compute_uhu(ansatz_dict, hamiltonian_operators)
+    energy = calculate_expectation(uhu_dict)
 
-            all_results.append({
-                "m": m,
-                "theta": optimized_theta,
-                "energy": energy,
-                "operators": current_ops
-            })
+    console_and_print(console, Panel(ansatz_symbolic, title="[bold]Символьное представление анзаца[/]", border_style="green"))
 
-            if energy < best_energy:
-                best_energy = energy
-                best_result = all_results[-1]
+    console_and_print(console,Panel(ansatz_numeric, title="[bold]Численное представление анзаца[/]", border_style="purple"))
 
-    # Выводим результаты оптимизации
-    if best_result is None:
-        console_and_print(console, Panel("[red]Не удалось найти решение[/red]", border_style="red"))
-        return
+    console_and_print(console, Panel(f"{energy:.6f}", title="[bold]Энергия (<0|U†HU|0> для состояния |0...0>)[/]", border_style="green"))
 
-    _, ansatz_symbolic, ansatz_numeric = calculate_ansatz(
-        best_result["theta"],
-        best_result["operators"]
-    )
-
-    console_and_print(console, Panel(ansatz_symbolic,
-        title="[bold]Символьное представление анзаца[/]", border_style="green"))
-
-    console_and_print(console, Panel(ansatz_numeric,
-        title="[bold]Численное представление анзаца[/]", border_style="purple"))
-
-    console_and_print(console, Panel(f"{best_result['energy']:.6f}",
-        title="[bold]Энергия (<0|U†HU|0> для состояния |0...0>)[/]", border_style="green"))
-
-    input('Нажмите Enter для выхода...')
+    input("Нажмите Enter для выхода...")
 
 if __name__ == "__main__":
     main()

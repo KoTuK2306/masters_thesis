@@ -8,6 +8,7 @@ from .calculate_expectation import calculate_expectation
 def simulated_annealing(
     initial_theta: np.ndarray,
     pauli_operators: List[Any],
+    hamiltonian_operators: List[Any],
     progress: Any,
     task: Any,
     initial_temp: float = 1000.0,
@@ -22,6 +23,7 @@ def simulated_annealing(
     Args:
         initial_theta (np.ndarray): Начальный вектор θ.
         pauli_operators (List[Tuple[complex, List[int]]]): Операторы Паули.
+        hamiltonian_operators List[Any]: Операторы гамильтониана
         progress (Any): Индикатор прогресса (может быть None).
         task (Any): Задача для прогресс-бара.
         initial_temp (float): Начальная температура (чем выше — тем вероятнее принять ухудшающее решение).
@@ -55,7 +57,7 @@ def simulated_annealing(
         for _ in range(thermalization_steps):
             neighbor_theta = generate_neighbor_theta(current_theta, step_size)
             ansatz_dict, _, _ = calculate_ansatz(neighbor_theta, pauli_operators)
-            uhu_dict = compute_uhu(ansatz_dict, pauli_operators)
+            uhu_dict = compute_uhu(ansatz_dict, hamiltonian_operators)
             current_energy = calculate_expectation(uhu_dict)
             if current_energy < best_energy:
                 best_theta = neighbor_theta.copy()
@@ -66,10 +68,10 @@ def simulated_annealing(
 
         # Основной цикл отжига с возможностью принимать ухудшения
         for _ in range(num_iterations_per_temp):
-            perturbation = rng.normal(0, step_size*(temp/initial_temp), current_theta.shape)
-            neighbor_theta = (current_theta + perturbation) % (2*np.pi)
+            perturbation = rng.normal(0, step_size * (temp / initial_temp), current_theta.shape)
+            neighbor_theta = (current_theta + perturbation) % (2 * np.pi)
             ansatz_dict, _, _ = calculate_ansatz(neighbor_theta, pauli_operators)
-            uhu_dict = compute_uhu(ansatz_dict, pauli_operators)
+            uhu_dict = compute_uhu(ansatz_dict, hamiltonian_operators)
             current_energy = calculate_expectation(uhu_dict)
             energy_diff = current_energy - best_energy
             # Классическое правило Метрополиса

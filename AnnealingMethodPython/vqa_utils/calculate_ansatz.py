@@ -27,7 +27,7 @@ def calculate_ansatz(
         С каждым новым оператором результат рекурсивно обновляется через pauli_compose.
     """
     operator_length = len(pauli_operators[0][1])
-    result: Dict[Tuple[int, ...], complex] = {tuple([0]*operator_length): 1.0}
+    result: Dict[Tuple[int, ...], complex] = {tuple([0] * operator_length): 1.0}
 
     for t, (coeff, op) in zip(theta, pauli_operators):
         angle = t * coeff
