@@ -35,6 +35,14 @@ def main() -> None:
     с классическим оптимизатором (simulated annealing).
     """
     console = initialize_environment()
+    
+    # Тестируемый анзац
+    pauli_operators = [
+        (1.0, [0, 0, 2, 1]),  # σ₀₀₂₁
+        (1.0, [1, 2, 0, 0]),  # σ₁₂₀₀
+        (1.0, [1, 1, 1, 2]),  # σ₁₁₁₂
+        (1.0, [1, 2, 1, 1]),  # σ₁₂₁₁
+    ]
 
     # Проверка наличия файла с гамильтонианом
     if not HAMILTONIAN_FILE_PATH.exists():
@@ -46,10 +54,14 @@ def main() -> None:
         return
 
     try:
-        pauli_operators, pauli_strings = read_hamiltonian_data(HAMILTONIAN_FILE_PATH)
-        print_hamiltonian(console, pauli_operators)
+        # Чтение операторов гамильтониана из файла 
+        hamiltonian_operators, _ = read_hamiltonian_data(HAMILTONIAN_FILE_PATH)
+        # Вывод прочтённого гамильтониана
+        print_hamiltonian(console, hamiltonian_operators)
+        # Вывод таблицы операторов гамильтониана (коэффициент, строка Паули)
         print_pauli_table(console, pauli_operators)
-        print_composition_table(console, pauli_compose, pauli_strings)
+        # Вывод композиций операторов Паули
+        print_composition_table(console, pauli_compose, [op for _, op in pauli_operators])
     except FileNotFoundError:
         console_and_print(console, Panel(f"[red]Файл {HAMILTONIAN_FILE_PATH} не найден[/red]", border_style="red"))
         return
@@ -58,28 +70,8 @@ def main() -> None:
         console_and_print(console, Panel("[red]Требуется минимум 2 оператора Паули[/red]", border_style="red"))
         return
 
-    # Тестируемый анзац
-    pauli_operators = [
-        (1.0, [0, 0, 2, 1]),  # σ₀₀₂₁
-        (1.0, [1, 2, 0, 0]),  # σ₁₂₀₀
-        (1.0, [1, 1, 1, 2]),  # σ₁₁₁₂
-        (1.0, [1, 2, 1, 1]),  # σ₁₂₁₁
-    ]
-
-    # Чтение операторов гамильтониана из файла 
-    hamiltonian_operators, _ = read_hamiltonian_data(HAMILTONIAN_FILE_PATH)
-
     # Получение начального состояния θ
     initial_theta = generate_shifted_theta(pauli_operators)
-
-    # Вывод прочтённого гамильтониана
-    print_hamiltonian(console, hamiltonian_operators)
-    
-    # Вывод таблицы операторов гамильтониана (коэффициент, строка Паули)
-    print_pauli_table(console, pauli_operators)
-
-    # Вывод композиций операторов Паули
-    print_composition_table(console, pauli_compose, [op for _, op in pauli_operators])
 
     # Параметры отжига
     SA_PARAMS = {
